@@ -8,6 +8,20 @@ import time
 import random
 import tkinter as tk
 from tkinter import messagebox
+import pickle
+import os
+
+# Function to save cookies to a file
+def save_cookies(driver, file_path):
+    with open(file_path, 'wb') as file:
+        pickle.dump(driver.get_cookies(), file)
+
+# Function to load cookies from a file
+def load_cookies(driver, file_path):
+    with open(file_path, 'rb') as file:
+        cookies = pickle.load(file)
+        for cookie in cookies:
+            driver.add_cookie(cookie)
 
 # Function to perform Bing searches
 def perform_search(driver, term):
@@ -29,21 +43,32 @@ def perform_search(driver, term):
         print(f"An error occurred: {e}")
 
 # Function to start the search process
-def start_search(chromedriver_path, search_limit):
+def start_search(chromedriver_path, search_limit, cookies_path):
     try:
         # Set up Chrome options
         chrome_options = Options()
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
 
-        # Path to the Chrome browser executable
-        CHROME_BROWSER_PATH = r'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe'
-        chrome_options.binary_location = CHROME_BROWSER_PATH  # Specify the path to the Chrome browser executable
-
         # Set up the Chrome WebDriver service
         service = Service(chromedriver_path)
         driver = webdriver.Chrome(service=service, options=chrome_options)
         driver.set_page_load_timeout(20)
+
+        # Check if cookies file exists
+        if os.path.exists(cookies_path):
+            driver.get("https://www.bing.com")
+            load_cookies(driver, cookies_path)
+            driver.refresh()
+        else:
+            # Prompt user to log in manually
+            driver.get("https://login.live.com/")
+            messagebox.showinfo("Login", "Please log in manually and then close the browser window.")
+            save_cookies(driver, cookies_path)
+            messagebox.showinfo("Success", "Cookies saved successfully. Please restart the script.")
+
+            driver.quit()
+            return
 
         # Read search terms from CSV file
         search_terms_df = pd.read_csv('search_terms.csv')
@@ -74,9 +99,10 @@ def start_search(chromedriver_path, search_limit):
 def start_from_gui():
     chromedriver_path = entry_path.get()
     search_limit = entry_limit.get()
+    cookies_path = 'cookies.pkl'
     if chromedriver_path and search_limit.isdigit():
         root.withdraw()  # Hide the GUI window
-        start_search(chromedriver_path, search_limit)
+        start_search(chromedriver_path, search_limit, cookies_path)
     else:
         messagebox.showerror("Error", "Please enter a valid ChromeDriver path and number of searches.")
 
